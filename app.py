@@ -25,10 +25,11 @@ if bowler_filter:
     filtered_df = filtered_df[filtered_df['bowlerPlayer'].isin(bowler_filter)]
 filtered_df = filtered_df[(filtered_df['overNumber'] >= over_filter[0]) & (filtered_df['overNumber'] <= over_filter[1])]
 
-# Helper: calculate False Shot %
+# Correct False Shot % Calculation
 def false_shot_percentage(df):
-    false_shots = df[~df['battingConnectionId'].isin(['wellTimed', 'Blank', 'Left', 'Middled'])].shape[0]
+    allowed_values = ['wellTimed', 'Blank', 'Left', 'Middled']
     total_balls = df.shape[0]
+    false_shots = df[~df['battingConnectionId'].isin(allowed_values)].shape[0]
     return round((false_shots / total_balls) * 100, 2) if total_balls > 0 else 0
 
 # Stats table function
@@ -49,7 +50,7 @@ st.dataframe(create_stats_table(filtered_df, 'battingFeetId'))
 
 # Tabs for Matrix views
 st.subheader("LengthTypeId vs LineTypeId Matrix Views")
-tab1, tab2, tab3 = st.tabs(["Strike Rate View", "False Shot % View", "Combined Heatmap"])
+tab1, tab2 = st.tabs(["Strike Rate View", "False Shot % View"])
 
 matrix = filtered_df.groupby(['lengthTypeId', 'lineTypeId']).agg(
     Total_Runs=('runsScored', 'sum'),
@@ -71,11 +72,6 @@ with tab2:
     st.write("**False Shot % (Red Gradient)**")
     st.dataframe(matrix_fs.style.background_gradient(cmap='Reds', axis=None))
 
-with tab3:
-    combined = (matrix_sr - matrix_sr.min().min()) / (matrix_sr.max().max() - matrix_sr.min().min()) - (matrix_fs - matrix_fs.min().min()) / (matrix_fs.max().max() - matrix_fs.min().min())
-    st.write("**Combined Heatmap (Green=High SR, Red=High False Shots)**")
-    st.dataframe(combined.style.background_gradient(cmap='RdYlGn', axis=None))
-
 # Table: Batting Shot Type ID
 st.subheader("Batting Shot Type ID Stats")
 st.dataframe(create_stats_table(filtered_df, 'battingShotTypeId'))
@@ -83,3 +79,22 @@ st.dataframe(create_stats_table(filtered_df, 'battingShotTypeId'))
 # Table: Bowling Detail ID
 st.subheader("Bowling Detail ID Stats")
 st.dataframe(create_stats_table(filtered_df, 'bowlingDetailId'))
+
+# Table: Bowler Stats
+st.subheader("Bowler Stats (bowlerPlayer)")
+st.dataframe(create_stats_table(filtered_df, 'bowlerPlayer'))
+
+# Table: Batting Connection ID with gradient
+st.subheader("Batting Connection ID")
+connection_counts = filtered_df['battingConnectionId'].value_counts(dropna=False).reset_index()
+connection_counts.columns = ['battingConnectionId', 'Count']
+
+def color_map(val):
+    if val in ['wellTimed', 'Middled']:
+        return 'background-color: lightgreen'
+    elif val in ['Left', 'Blank', 'nan', 'NaN']:
+        return 'background-color: khaki'
+    else:
+        return 'background-color: lightcoral'
+
+st.dataframe(connection_counts.style.applymap(color_map, subset=['battingConnectionId']))
